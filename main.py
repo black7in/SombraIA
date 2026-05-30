@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import firebase_admin
 from firebase_admin import credentials
 
-from routers import analizar, parcelas, alertas
+from routers import analizar, parcelas, chat
 
 
 @asynccontextmanager
@@ -31,7 +31,7 @@ app.add_middleware(
 
 app.include_router(analizar.router, prefix="/api")
 app.include_router(parcelas.router, prefix="/api")
-app.include_router(alertas.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
 
 
 @app.get("/api/health")

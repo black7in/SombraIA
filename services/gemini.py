@@ -86,14 +86,6 @@ Respondé directamente sin presentarte.
 """.strip())
 
 
-def alerta_incendio(lat: float, lng: float) -> str:
-    return _generar(f"""
-Sos un técnico agrícola de Santa Cruz, Bolivia. Redactá un mensaje de alerta
-de incendio corto (máximo 2 oraciones) para agricultores cercanos a las coordenadas
-{lat:.3f}, {lng:.3f}. Indicá precaución y qué hacer. Sin saludos, directo al punto.
-""".strip())
-
-
 def calendario(especies: list, municipio: str) -> str:
     return _generar(f"""
 Creá un calendario mensual de plantación para estas especies en {municipio},
