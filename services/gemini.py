@@ -148,6 +148,35 @@ Respondé directamente sin presentarte.
 """.strip())
 
 
+def cuidados(puntos: list, modo: str, zona_quemada: bool) -> list:
+    import re, json as _json
+    especies = list({p["especie"] for p in puntos})
+    ctx_modo = "agroforestal (cortina en borde del cultivo)" if modo == "agro" else "plantación ambiental"
+    ctx_fuego = " en zona post-incendio" if zona_quemada else ""
+
+    texto = _generar(f"""
+Sos un experto en árboles nativos de Santa Cruz, Bolivia.
+Para las siguientes especies en una plantación {ctx_modo}{ctx_fuego},
+generá exactamente 5 instrucciones de cuidado cortas y prácticas.
+
+Especies: {', '.join(especies)}
+
+Respondé ÚNICAMENTE con un JSON array de 5 strings, sin texto adicional ni markdown.
+Ejemplo: ["instrucción 1", "instrucción 2", "instrucción 3", "instrucción 4", "instrucción 5"]
+
+Incluí: riego inicial, protección/tutores, primera poda, época óptima de plantación,
+señal de que el árbol se estableció correctamente.
+""".strip())
+
+    match = re.search(r'\[.*?\]', texto, re.DOTALL)
+    if match:
+        try:
+            return _json.loads(match.group())
+        except Exception:
+            pass
+    return [l.strip('- •\n"') for l in texto.split("\n") if l.strip()][:5]
+
+
 def calendario(especies: list, municipio: str) -> str:
     return _generar(f"""
 Creá un calendario mensual de plantación para estas especies en {municipio},

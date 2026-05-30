@@ -10,6 +10,8 @@ _ESPECIES = json.loads(
     (Path(__file__).parent.parent / "data" / "especies.json").read_text(encoding="utf-8")
 )
 
+_VELOCIDAD_M_ANIO = {"rapida": 1.5, "media": 0.9, "lenta": 0.4}
+
 
 def analizar(poligono: list, modo: str, n_arboles: int, cultivo: str = None) -> dict:
     lats = [p[0] for p in poligono]
@@ -22,12 +24,18 @@ def analizar(poligono: list, modo: str, n_arboles: int, cultivo: str = None) -> 
 
     if modo == "agro":
         return _resultado_agro(poligono, cultivo, solar, ee_data, n_arboles)
-    else:
-        return _resultado_ambiental(poligono, solar, ee_data, n_arboles)
+    return _resultado_ambiental(poligono, solar, ee_data, n_arboles)
 
 
 def _resultado_agro(poligono, cultivo, solar, ee_data, n_arboles):
-    puntos = _optimizar_plantacion(poligono, solar, n_arboles, cultivo=cultivo)
+    shape = Polygon([(p[1], p[0]) for p in poligono])
+    posicion_optima = solar.get("posicion_sombra_optima", "norte")
+
+    especies_validas = [e for e in _ESPECIES if cultivo in e.get("compatible_con", [])]
+    if not especies_validas:
+        especies_validas = _ESPECIES[:3]
+
+    puntos = _puntos_en_borde(shape, posicion_optima, n_arboles, especies_validas)
     cultivos = _recomendar_cultivos(cultivo, ee_data["ndvi"], ee_data["zona_quemada"])
     ahorro = round(25 + min(solar["horas_criticas_dia"] * 1.5, 15))
 
@@ -50,13 +58,20 @@ def _resultado_agro(poligono, cultivo, solar, ee_data, n_arboles):
             "zona_quemada": ee_data["zona_quemada"],
             "arboles_sugeridos": len(puntos),
             "ahorro_agua_pct": ahorro,
+            "posicion_cortina": posicion_optima,
         },
     }
 
 
 def _resultado_ambiental(poligono, solar, ee_data, n_arboles):
-    puntos = _optimizar_plantacion(poligono, solar, n_arboles, cultivo=None)
-    impacto = _calcular_impacto_ambiental(poligono, puntos)
+    shape = Polygon([(p[1], p[0]) for p in poligono])
+    posicion_optima = solar.get("posicion_sombra_optima", "norte")
+
+    especies_validas = sorted(_ESPECIES, key=lambda e: e.get("radio_sombra_m", 0), reverse=True)
+    puntos = _puntos_interior(shape, posicion_optima, n_arboles, especies_validas)
+
+    impacto = _calcular_impacto_ambiental(shape, puntos)
+    proyeccion = _proyectar_crecimiento(shape, puntos)
 
     return {
         "modo": "ambiental",
@@ -66,6 +81,7 @@ def _resultado_ambiental(poligono, solar, ee_data, n_arboles):
         "reduccion_temp_suelo_c": 2.1,
         "ndvi": ee_data["ndvi"],
         "zona_quemada": ee_data["zona_quemada"],
+        "proyeccion_crecimiento": proyeccion,
         "datos_para_gemini": {
             "horas_sol_directo": solar["horas_sol_dia"],
             "horas_criticas_dia": solar["horas_criticas_dia"],
@@ -80,136 +96,43 @@ def _resultado_ambiental(poligono, solar, ee_data, n_arboles):
     }
 
 
-def _calcular_impacto_ambiental(poligono: list, puntos: list) -> dict:
-    shape = Polygon([(p[1], p[0]) for p in poligono])
-    area_m2 = shape.area * (111_000 ** 2)
+def _puntos_en_borde(shape: Polygon, posicion: str, n_arboles: int, especies: list) -> list:
+    """Agro: árboles en el borde óptimo como cortina rompevientos, no adentro del cultivo."""
+    minx, miny, maxx, maxy = shape.bounds
+    OFFSET = 0.00002  # ~2m adentro del borde
 
-    especies_por_nombre = {e["nombre"]: e for e in _ESPECIES}
-    sombra_total_m2 = 0
-    co2_total = 0
+    puntos = []
+    for i in range(n_arboles):
+        especie = especies[i % len(especies)]
+        t = (i + 1) / (n_arboles + 1)
 
-    for p in puntos:
-        especie = especies_por_nombre.get(p["especie"], {})
-        radio = especie.get("radio_sombra_m", 6)
-        altura = especie.get("altura_max_m", 10)
-        sombra_total_m2 += math.pi * radio ** 2
-        co2_total += round(20 + altura * 1.8)
+        if posicion == "norte":
+            px, py = minx + t * (maxx - minx), maxy - OFFSET
+        elif posicion == "sur":
+            px, py = minx + t * (maxx - minx), miny + OFFSET
+        elif posicion == "este":
+            px, py = maxx - OFFSET, miny + t * (maxy - miny)
+        else:
+            px, py = minx + OFFSET, miny + t * (maxy - miny)
 
-    cobertura_pct = min(100, round(sombra_total_m2 / area_m2 * 100, 1)) if area_m2 > 0 else 0
+        punto = Point(px, py)
+        if not shape.contains(punto):
+            punto = shape.centroid
 
-    return {
-        "cobertura_sombra_pct": cobertura_pct,
-        "co2_estimado_kg_anual": round(co2_total),
-    }
+        puntos.append({
+            "lat": round(punto.y, 6),
+            "lng": round(punto.x, 6),
+            "especie": especie["nombre"],
+            "posicion": f"cortina_{posicion}",
+            "distancia_borde_m": round(shape.exterior.distance(punto) * 111000, 1),
+        })
 
-
-def _calcular_horas_sol(lat: float, lng: float) -> dict:
-    ubicacion = pvlib.location.Location(
-        latitude=lat,
-        longitude=lng,
-        tz="America/La_Paz",
-        altitude=400,
-    )
-    tiempos = pd.date_range(
-        start="2024-01-01",
-        end="2024-12-31",
-        freq="1h",
-        tz="America/La_Paz",
-    )
-    posicion_solar = ubicacion.get_solarposition(tiempos)
-    sol_directo = posicion_solar[posicion_solar["elevation"] > 10]
-    horas_por_dia = len(sol_directo) / 365
-
-    horas_criticas = sol_directo[
-        (sol_directo.index.hour >= 10) & (sol_directo.index.hour <= 15)
-    ]
-    horas_criticas_dia = len(horas_criticas) / 365
-    azimuth_medio = sol_directo["azimuth"].median()
-
-    return {
-        "horas_sol_dia": round(horas_por_dia, 1),
-        "horas_criticas_dia": round(horas_criticas_dia, 1),
-        "azimuth_medio": round(float(azimuth_medio), 1),
-        "posicion_sombra_optima": _azimuth_a_posicion(azimuth_medio),
-    }
+    return puntos
 
 
-def _azimuth_a_posicion(azimuth: float) -> str:
-    if 45 <= azimuth < 135:
-        return "norte"
-    elif 135 <= azimuth < 225:
-        return "este"
-    elif 225 <= azimuth < 315:
-        return "sur"
-    else:
-        return "oeste"
-
-
-def _analizar_parcela(poligono: list) -> dict:
-    coords = [[p[1], p[0]] for p in poligono]
-    region = ee.Geometry.Polygon(coords)
-
-    sentinel = (
-        ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
-        .filterBounds(region)
-        .filterDate("2024-09-01", "2024-12-01")
-        .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 20))
-        .median()
-    )
-    ndvi = sentinel.normalizedDifference(["B8", "B4"])
-    ndvi_valor = (
-        ndvi.reduceRegion(reducer=ee.Reducer.mean(), geometry=region, scale=10)
-        .getInfo()
-        .get("nd", 0)
-    )
-
-    fuego = (
-        ee.ImageCollection("MODIS/061/MOD14A1")
-        .filterBounds(region)
-        .filterDate("2024-01-01", "2024-12-31")
-        .select("FireMask")
-    )
-    max_fire = (
-        fuego.max()
-        .reduceRegion(reducer=ee.Reducer.max(), geometry=region, scale=500)
-        .getInfo()
-        .get("FireMask", 0)
-    )
-
-    lst = (
-        ee.ImageCollection("MODIS/061/MOD11A1")
-        .filterBounds(region)
-        .filterDate("2024-10-01", "2024-12-31")
-        .select("LST_Day_1km")
-        .mean()
-    )
-    temp_k = (
-        lst.reduceRegion(reducer=ee.Reducer.mean(), geometry=region, scale=1000)
-        .getInfo()
-        .get("LST_Day_1km", 0)
-    )
-    temp_c = round((temp_k * 0.02) - 273.15, 1) if temp_k else 38.0
-
-    return {
-        "ndvi": round(float(ndvi_valor or 0), 3),
-        "zona_quemada": bool(max_fire >= 7),
-        "temp_suelo_c": temp_c,
-    }
-
-
-def _optimizar_plantacion(poligono: list, solar: dict, n_arboles: int, cultivo: str = None) -> list:
-    shape = Polygon([(p[1], p[0]) for p in poligono])
+def _puntos_interior(shape: Polygon, posicion_optima: str, n_arboles: int, especies: list) -> list:
+    """Ambiental: distribuye árboles dentro del polígono maximizando cobertura."""
     bounds = shape.bounds
-    posicion_optima = solar.get("posicion_sombra_optima", "norte")
-
-    if cultivo:
-        especies_validas = [e for e in _ESPECIES if cultivo in e.get("compatible_con", [])]
-        if not especies_validas:
-            especies_validas = _ESPECIES[:3]
-    else:
-        # Modo ambiental: priorizar mayor radio de sombra y diversidad nativa
-        especies_validas = sorted(_ESPECIES, key=lambda e: e.get("radio_sombra_m", 0), reverse=True)
-
     offsets = {
         "norte": (0, 0.0003),
         "sur": (0, -0.0003),
@@ -220,7 +143,7 @@ def _optimizar_plantacion(poligono: list, solar: dict, n_arboles: int, cultivo: 
     puntos = []
 
     for i in range(n_arboles):
-        especie = especies_validas[i % len(especies_validas)]
+        especie = especies[i % len(especies)]
         dx, dy = offsets.get(posicion_optima, (0, 0.0002))
         t = (i + 1) / (n_arboles + 1)
         px = bounds[0] + t * (bounds[2] - bounds[0]) + dx
@@ -239,6 +162,107 @@ def _optimizar_plantacion(poligono: list, solar: dict, n_arboles: int, cultivo: 
         })
 
     return puntos
+
+
+def _proyectar_crecimiento(shape: Polygon, puntos: list) -> dict:
+    """Proyección matemática de altura y cobertura por año según velocidad de cada especie."""
+    area_m2 = max(shape.area * (111_000 ** 2), 1)
+    especies_por_nombre = {e["nombre"]: e for e in _ESPECIES}
+    proyeccion = {}
+
+    for anio, factor in [(1, 0.5), (3, 1.0), (5, 1.0), (10, 1.0)]:
+        sombra_m2 = 0
+        altura_total = 0
+        for p in puntos:
+            esp = especies_por_nombre.get(p["especie"], {})
+            vel = _VELOCIDAD_M_ANIO.get(esp.get("velocidad_crecimiento", "media"), 0.9)
+            h_max = esp.get("altura_max_m", 10)
+            r_max = esp.get("radio_sombra_m", 5)
+            h = min(vel * anio * factor, h_max)
+            r = r_max * (h / h_max)
+            sombra_m2 += math.pi * r ** 2
+            altura_total += h
+
+        n = max(len(puntos), 1)
+        proyeccion[f"año_{anio}"] = {
+            "altura_media_m": round(altura_total / n, 1),
+            "cobertura_pct": min(100, round(sombra_m2 / area_m2 * 100, 1)),
+        }
+
+    return proyeccion
+
+
+def _calcular_impacto_ambiental(shape: Polygon, puntos: list) -> dict:
+    area_m2 = max(shape.area * (111_000 ** 2), 1)
+    especies_por_nombre = {e["nombre"]: e for e in _ESPECIES}
+    sombra_m2 = 0
+    co2 = 0
+    for p in puntos:
+        esp = especies_por_nombre.get(p["especie"], {})
+        sombra_m2 += math.pi * esp.get("radio_sombra_m", 6) ** 2
+        co2 += round(20 + esp.get("altura_max_m", 10) * 1.8)
+    return {
+        "cobertura_sombra_pct": min(100, round(sombra_m2 / area_m2 * 100, 1)),
+        "co2_estimado_kg_anual": round(co2),
+    }
+
+
+def _calcular_horas_sol(lat: float, lng: float) -> dict:
+    ubicacion = pvlib.location.Location(latitude=lat, longitude=lng, tz="America/La_Paz", altitude=400)
+    tiempos = pd.date_range(start="2024-01-01", end="2024-12-31", freq="1h", tz="America/La_Paz")
+    pos = ubicacion.get_solarposition(tiempos)
+    sol = pos[pos["elevation"] > 10]
+    criticas = sol[(sol.index.hour >= 10) & (sol.index.hour <= 15)]
+    azimuth = sol["azimuth"].median()
+    return {
+        "horas_sol_dia": round(len(sol) / 365, 1),
+        "horas_criticas_dia": round(len(criticas) / 365, 1),
+        "azimuth_medio": round(float(azimuth), 1),
+        "posicion_sombra_optima": _azimuth_a_posicion(azimuth),
+    }
+
+
+def _azimuth_a_posicion(azimuth: float) -> str:
+    if 45 <= azimuth < 135:
+        return "norte"
+    elif 135 <= azimuth < 225:
+        return "este"
+    elif 225 <= azimuth < 315:
+        return "sur"
+    return "oeste"
+
+
+def _analizar_parcela(poligono: list) -> dict:
+    coords = [[p[1], p[0]] for p in poligono]
+    region = ee.Geometry.Polygon(coords)
+
+    ndvi_valor = (
+        ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
+        .filterBounds(region).filterDate("2024-09-01", "2024-12-01")
+        .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 20)).median()
+        .normalizedDifference(["B8", "B4"])
+        .reduceRegion(reducer=ee.Reducer.mean(), geometry=region, scale=10)
+        .getInfo().get("nd", 0)
+    )
+    max_fire = (
+        ee.ImageCollection("MODIS/061/MOD14A1")
+        .filterBounds(region).filterDate("2024-01-01", "2024-12-31")
+        .select("FireMask").max()
+        .reduceRegion(reducer=ee.Reducer.max(), geometry=region, scale=500)
+        .getInfo().get("FireMask", 0)
+    )
+    temp_k = (
+        ee.ImageCollection("MODIS/061/MOD11A1")
+        .filterBounds(region).filterDate("2024-10-01", "2024-12-31")
+        .select("LST_Day_1km").mean()
+        .reduceRegion(reducer=ee.Reducer.mean(), geometry=region, scale=1000)
+        .getInfo().get("LST_Day_1km", 0)
+    )
+    return {
+        "ndvi": round(float(ndvi_valor or 0), 3),
+        "zona_quemada": bool(max_fire >= 7),
+        "temp_suelo_c": round((temp_k * 0.02) - 273.15, 1) if temp_k else 38.0,
+    }
 
 
 def _recomendar_cultivos(cultivo_actual: str, ndvi: float, zona_quemada: bool) -> list:

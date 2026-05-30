@@ -36,17 +36,20 @@ def analizar(solicitud: SolicitudAnalisis, user=Depends(verify_token)):
         puntos = resultado["puntos"]
 
         if solicitud.modo == "agro":
-            if zona_quemada:
-                texto = gemini.recomendar_agro_zona_quemada(datos, puntos)
-            else:
-                texto = gemini.recomendar_agro(datos, puntos, resultado["cultivos_compatibles"])
+            texto = (
+                gemini.recomendar_agro_zona_quemada(datos, puntos)
+                if zona_quemada
+                else gemini.recomendar_agro(datos, puntos, resultado["cultivos_compatibles"])
+            )
         else:
-            if zona_quemada:
-                texto = gemini.recomendar_ambiental_zona_quemada(datos, puntos)
-            else:
-                texto = gemini.recomendar_ambiental(datos, puntos)
+            texto = (
+                gemini.recomendar_ambiental_zona_quemada(datos, puntos)
+                if zona_quemada
+                else gemini.recomendar_ambiental(datos, puntos)
+            )
 
         resultado["recomendacion_texto"] = texto
+        resultado["cuidados"] = gemini.cuidados(puntos, solicitud.modo, zona_quemada)
         del resultado["datos_para_gemini"]
         return resultado
 
