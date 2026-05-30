@@ -1,312 +1,275 @@
-# SombraIA 🌳
+# SombraAI
 
-**Plantaciones inteligentes para Santa Cruz, Bolivia**
-
-SombraIA es una plataforma móvil que analiza parcelas agrícolas y zonas afectadas por incendios en Santa Cruz, y genera recomendaciones precisas de dónde plantar árboles nativos y qué cultivar — reduciendo el consumo de agua hasta un 35% y acelerando la recuperación de suelos degradados.
-
----
-
-## El problema
-
-Santa Cruz enfrenta dos crisis silenciosas:
-
-- **70%** del agua agrícola se pierde por evaporación en suelos expuestos al sol
-- **4.2 millones de hectáreas** quemadas en los últimos 5 años sin plan de reforestación inteligente
-
-Los agricultores saben que los árboles ayudan. El problema es saber **dónde** plantarlos.
+Plataforma de recomendación de plantación de árboles nativos para Santa Cruz, Bolivia.
+Cualquier persona con un terreno puede analizar su parcela y recibir puntos estratégicos
+de plantación, estimaciones de impacto ambiental y cuidados por especie.
 
 ---
 
-## La solución
+## Casos de uso
 
-SombraIA cruza datos satelitales (Google Earth Engine), simulación solar (pvlib) y optimización espacial (scipy) para devolver en segundos:
+**Modo ambiental** — para cualquier persona con terreno que quiera generar sombra,
+capturar CO2 o reforestar. Los árboles se ubican dentro del terreno maximizando
+cobertura. Incluye proyección de crecimiento a 1, 3, 5 y 10 años.
 
-- Mapa con puntos GPS exactos donde plantar árboles
-- Especies nativas de Santa Cruz recomendadas por posición
-- Cultivos compatibles para sembrar junto a los árboles
-- Estimación de ahorro de agua semanal
-- Plan de reforestación por fases para zonas quemadas
-- Recomendaciones en lenguaje natural generadas por Gemini
+**Modo agro** — para agricultores. Los árboles se colocan en los bordes del campo
+como cortinas rompevientos, sin competir con el cultivo ni su sistema de riego.
 
----
-
-## Funcionalidades
-
-### Modo agricultor
-El usuario dibuja o ubica su parcela. La app analiza el microclima, la trayectoria solar y el estado del suelo para recomendar una combinación de árboles y cultivos que maximiza el aprovechamiento del agua disponible.
-
-### Modo reforestación
-Para zonas afectadas por incendios. La app detecta el área quemada con satélite, genera un plan de plantación por fases (pioneras primero, nativas de mayor porte después) y diseña corredores de humedad que conectan con parcelas vecinas.
-
-### Alertas de incendios
-Una Cloud Function corre diariamente, detecta focos activos en Santa Cruz con MODIS/Earth Engine y envía notificaciones push a usuarios en el área afectada.
-
-### Chatbot agronómico
-El usuario puede hacer preguntas sobre su parcela guardada y Gemini responde con contexto personalizado en español natural.
+**Zona quemada** — detectada automáticamente vía satélite. Adapta las recomendaciones
+a recuperación post-incendio en ambos modos.
 
 ---
 
-## Stack tecnológico
+## Stack
 
-| Capa | Tecnología | Uso |
-|---|---|---|
-| App móvil | Expo + React Native | iOS y Android desde un solo código |
-| Mapas | Google Maps SDK | Visualización y dibujo de parcelas |
-| Base de datos | Firebase Firestore | Usuarios, parcelas, resultados, alertas |
-| Geo queries | Supabase + PostGIS | Búsqueda de parcelas por proximidad |
-| Motor IA | Python en Cloud Run | pvlib + scipy + Earth Engine |
-| Datos satelitales | Google Earth Engine | NDVI, detección de quemas, temperatura |
-| IA generativa | Vertex AI — Gemini | Recomendaciones en lenguaje natural |
-| Alertas | Cloud Functions + Scheduler | Detección diaria de incendios |
-| API Gateway | Cloud Functions | Punto de entrada unificado para la app |
-
-Todo el stack usa planes gratuitos y escala sin cambios de código.
+| Capa | Tecnología |
+|---|---|
+| Backend | Python 3.11 · FastAPI · Cloud Run |
+| Satélite | Google Earth Engine (Sentinel-2, MODIS) |
+| Solar | pvlib |
+| IA | Vertex AI — Gemini 1.5 Flash |
+| Base de datos | Cloud Firestore |
+| Auth | Firebase Authentication |
+| App móvil | React Native |
 
 ---
 
-## Arquitectura
-
-```
-App Expo (React Native)
-        │
-        ▼
-API Gateway (Cloud Functions)
-        │
-   ┌────┴────────────────┐
-   │                     │
-   ▼                     ▼
-Motor IA              Gemini API
-(Cloud Run)         (Vertex AI)
-   │
-   ├── pvlib (simulación solar)
-   ├── scipy (optimizador)
-   └── Earth Engine (satélite)
-        │
-   ┌────┴────────────────┐
-   │                     │
-   ▼                     ▼
-Firestore           Supabase
-(datos app)         (geo queries)
-```
-
----
-
-## Estructura del repositorio
-
-```
-sombraia/
-├── modulo1_infraestructura/   # Firebase, Firestore, Supabase, Auth
-├── modulo2_motor_ia/          # Python: pvlib, scipy, Earth Engine
-├── modulo3_gemini_alertas/    # Gemini API, Cloud Functions, alertas
-├── modulo4_api_gateway/       # Gateway, CRUD, tests, mock data
-├── app/                       # Expo React Native (fase 2)
-├── docs/
-│   ├── modulo1_infraestructura.md
-│   ├── modulo2_motor_ia.md
-│   ├── modulo3_gemini_alertas.md
-│   └── modulo4_api_gateway.md
-└── README.md
-```
-
----
-
-## Setup rápido
-
-### Requisitos previos
-
-- Node.js 20+
-- Python 3.11+
-- Google Cloud SDK (`gcloud`)
-- Cuenta en [Firebase](https://firebase.google.com) y [Supabase](https://supabase.com)
-- Acceso a [Google Earth Engine](https://earthengine.google.com) (cuenta gratuita de investigación)
-
-### 1. Clonar el repositorio
+## Setup
 
 ```bash
-git clone https://github.com/tu-equipo/sombraia.git
-cd sombraia
-```
+# Requisitos: Python 3.11+, Google Cloud SDK
 
-### 2. Configurar variables de entorno
-
-Copiar el archivo de ejemplo y completar con las credenciales reales (pedirlas a Dev 1):
-
-```bash
 cp .env.example .env
+# Completar con serviceAccountKey.json y GOOGLE_CLOUD_PROJECT
+
+uvicorn main:app --reload --port 8080
 ```
 
-```env
-# GCP
-GOOGLE_CLOUD_PROJECT=sombraia-hackathon
-GOOGLE_APPLICATION_CREDENTIALS=./serviceAccountKey.json
-
-# Firebase
-FIREBASE_WEB_CLIENT_ID=
-FIREBASE_API_KEY=
-FIREBASE_AUTH_DOMAIN=
-FIREBASE_PROJECT_ID=
-
-# Supabase
-SUPABASE_URL=
-SUPABASE_ANON_KEY=
-
-# URLs de módulos (se completan al hacer deploy)
-MOTOR_URL=
-GEMINI_URL=
-GATEWAY_URL=
-```
-
-### 3. Setup por módulo
-
-Cada módulo tiene sus propias instrucciones detalladas en `/docs/`:
-
-```bash
-# Módulo 1 — Infraestructura
-cat docs/modulo1_infraestructura.md
-
-# Módulo 2 — Motor IA
-cat docs/modulo2_motor_ia.md
-
-# Módulo 3 — Gemini + Alertas
-cat docs/modulo3_gemini_alertas.md
-
-# Módulo 4 — API Gateway
-cat docs/modulo4_api_gateway.md
-```
+Ver `.env.example` para instrucciones de credenciales y configuración React Native.
 
 ---
 
 ## API
 
-Todos los endpoints pasan por el Gateway. URL base publicada en el canal del equipo.
+Base URL: `https://<cloud-run-url>/api`
 
-### Autenticación
-
-Todos los endpoints requieren token Firebase en el header:
-
+Todos los endpoints (excepto `/health`) requieren:
 ```
-Authorization: Bearer <firebase_id_token>
+Authorization: Bearer <firebase-id-token>
 ```
 
-### Endpoints
+---
 
-#### `GET /api/health`
-Estado del sistema. Sin autenticación.
+### Health
 
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `GET` | `/health` | Estado del servidor. Sin autenticación. |
+
+**Response**
 ```json
-{
-  "status": "ok",
-  "version": "1.0",
-  "modulos": {
-    "motor": "conectado",
-    "gemini": "conectado"
-  }
-}
+{ "status": "ok", "version": "2.0" }
 ```
 
-#### `POST /api/analizar`
-Análisis completo de una parcela.
+---
 
-**Body:**
+### Auth
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `POST` | `/auth/register` | Registra al usuario tras el primer login |
+| `GET` | `/auth/me` | Perfil del usuario autenticado |
+
+#### `POST /auth/register`
+```json
+// Body
+{ "nombre": "Juan Pérez", "departamento": "Santa Cruz" }
+
+// Response 201
+{ "uid": "abc123", "nombre": "Juan Pérez" }
+```
+
+#### `GET /auth/me`
+```json
+// Response 200
+{ "uid": "abc123", "nombre": "Juan Pérez", "email": "juan@example.com", "departamento": "Santa Cruz" }
+```
+
+---
+
+### Análisis
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `POST` | `/analizar` | Analiza el terreno y devuelve puntos de plantación |
+
+#### `POST /analizar`
+
+**Body — modo ambiental**
 ```json
 {
   "poligono": [[-17.48, -63.25], [-17.49, -63.25], [-17.49, -63.24], [-17.48, -63.24]],
-  "cultivo": "soya",
-  "modo": "agro",
+  "modo": "ambiental",
   "n_arboles": 5
 }
 ```
 
-**Respuesta:**
+**Body — modo agro** (`cultivo` requerido)
 ```json
 {
-  "puntos": [
-    { "lat": -17.4823, "lng": -63.2514, "especie": "Tajibo", "posicion": "norte", "distancia_borde_m": 5 }
-  ],
-  "ahorro_agua_pct": 32,
-  "ndvi": 0.41,
-  "zona_quemada": false,
-  "cultivos_compatibles": ["poroto", "yuca", "maní"],
-  "recomendacion_texto": "Con los árboles recomendados vas a reducir tu riego en un 32%..."
+  "poligono": [[-17.48, -63.25], [-17.49, -63.25], [-17.49, -63.24], [-17.48, -63.24]],
+  "modo": "agro",
+  "cultivo": "soya",
+  "n_arboles": 5
 }
 ```
 
-#### `GET /api/parcelas`
-Lista las parcelas guardadas del usuario autenticado.
+**Response — modo ambiental**
+```json
+{
+  "modo": "ambiental",
+  "puntos": [
+    { "lat": -17.483, "lng": -63.248, "especie": "Tipa", "posicion": "norte", "distancia_borde_m": 12.4 }
+  ],
+  "cobertura_sombra_pct": 42,
+  "co2_estimado_kg_anual": 115,
+  "reduccion_temp_suelo_c": 2.1,
+  "ndvi": 0.38,
+  "zona_quemada": false,
+  "proyeccion_crecimiento": {
+    "año_1":  { "altura_media_m": 0.9,  "cobertura_pct": 4  },
+    "año_3":  { "altura_media_m": 4.1,  "cobertura_pct": 18 },
+    "año_5":  { "altura_media_m": 6.8,  "cobertura_pct": 32 },
+    "año_10": { "altura_media_m": 13.5, "cobertura_pct": 42 }
+  },
+  "cuidados": [
+    "Regar cada 3 días los primeros 6 meses",
+    "Colocar tutor de 1.5m hasta que el árbol se afirme",
+    "Plantar al inicio de las lluvias (noviembre)",
+    "Primera poda formativa al segundo año",
+    "El árbol está establecido cuando brota sin riego artificial"
+  ],
+  "recomendacion_texto": "Tu terreno recibe más de 9 horas de sol intenso..."
+}
+```
 
-#### `POST /api/parcelas`
-Guarda una parcela y su resultado de análisis en Firestore.
+**Response — modo agro**
+```json
+{
+  "modo": "agro",
+  "puntos": [
+    { "lat": -17.483, "lng": -63.248, "especie": "Algarrobo", "posicion": "cortina_norte", "distancia_borde_m": 2.0 }
+  ],
+  "ahorro_agua_pct": 32,
+  "reduccion_temp_suelo_c": 2.1,
+  "ndvi": 0.41,
+  "zona_quemada": false,
+  "cultivos_compatibles": ["poroto", "maní", "yuca"],
+  "cobertura_recomendada": "pasto nativo entre hileras",
+  "cuidados": ["..."],
+  "recomendacion_texto": "..."
+}
+```
 
-#### `DELETE /api/parcelas/:id`
-Elimina una parcela del usuario.
-
-#### `GET /api/alertas?lat=-17.48&lng=-63.25&radio_km=50`
-Alertas de incendios activas. Filtra por proximidad si se pasan coordenadas.
+> Si `zona_quemada: true`, los puntos y el texto se adaptan automáticamente
+> a recuperación post-incendio en ambos modos.
 
 ---
 
-## Especies nativas
+### Parcelas
 
-El motor recomienda exclusivamente especies nativas de Santa Cruz:
-
-| Especie | Nombre científico | Uso principal |
+| Método | Endpoint | Descripción |
 |---|---|---|
-| Tajibo | *Tabebuia impetiginosa* | Post-incendio, pionera |
-| Toborochi | *Ceiba speciosa* | Sombra amplia, retiene humedad |
-| Cuchi | *Astronium urundeuva* | Resistente al calor y sequía |
-| Algarrobo | *Prosopis alba* | Fija nitrógeno, mejora suelo |
-| Cedro | *Cedrela odorata* | Cortavientos, crecimiento rápido |
+| `GET` | `/parcelas` | Lista las parcelas del usuario |
+| `GET` | `/parcelas/{id}` | Devuelve una parcela con su resultado |
+| `POST` | `/parcelas` | Guarda una parcela con su resultado |
+| `PUT` | `/parcelas/{id}` | Actualiza nombre o notas |
+| `DELETE` | `/parcelas/{id}` | Elimina una parcela |
+| `GET` | `/parcelas/{id}/calendario` | Calendario de plantación por especie |
 
----
+#### `POST /parcelas`
+```json
+// Body
+{
+  "nombre": "Campo norte",
+  "poligono": [[-17.48, -63.25], ["..."]],
+  "modo": "agro",
+  "cultivo": "soya",
+  "resultado": { "...resultado de /analizar..." }
+}
 
-## Equipo de desarrollo
+// Response 201
+{ "id": "xyz" }
+```
 
-| Dev | Módulo | Responsabilidad |
+#### `PUT /parcelas/{id}`
+```json
+// Body (todos los campos son opcionales)
+{ "nombre": "Campo norte — 2025", "notas": "Pendiente leve al este" }
+
+// Response 200
+{ "id": "xyz" }
+```
+
+#### `GET /parcelas/{id}/calendario?municipio=San+Julián`
+
+| Query param | Default | Descripción |
 |---|---|---|
-| Dev 1 | Infraestructura | Firebase, Firestore, Supabase, credenciales GCP |
-| Dev 2 | Motor IA | pvlib, Earth Engine, optimizador, Cloud Run |
-| Dev 3 | Gemini + Alertas | Recomendaciones en lenguaje natural, alertas de incendios |
-| Dev 4 | API Gateway | Punto de entrada unificado, tests, datos de demo |
+| `municipio` | `Santa Cruz` | Municipio para ajustar el calendario estacional |
 
----
-
-## Regla de trabajo en paralelo
-
-Dev 2 publica `mock_resultado.json` el día 1 antes del mediodía. Dev 3 y Dev 4 trabajan contra ese mock desde el primer momento. Cuando el módulo real esté listo, solo se actualiza la variable de entorno — el código no cambia.
-
----
-
-## Tests
-
-```bash
-# Tests del gateway (incluye fallback a mocks)
-cd modulo4_api_gateway
-NODE_ENV=development npx jest
-
-# Tests contra el gateway deployado
-GATEWAY_URL=https://tu-gateway.run.app npx jest
-
-# Verificar que la demo está lista
-npx jest && echo "Todo OK — demo lista"
+```json
+// Response 200
+{
+  "calendario": "Noviembre - Tipa - Plantar al inicio de lluvias\nDiciembre - ...",
+  "especies": ["Tipa", "Algarrobo"],
+  "municipio": "San Julián"
+}
 ```
 
 ---
 
-## Demo
+### Chat
 
-Dos escenarios precargados para la presentación:
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `POST` | `/chat` | Chatbot agronómico con contexto de la parcela |
 
-- **Parcela San Julián** — Soya, modo agro, 1.2 ha
-- **Zona quemada Warnes** — Post-incendio, reforestación por fases
+#### `POST /chat`
+```json
+// Body
+{
+  "pregunta": "¿Cuándo debo regar los árboles?",
+  "parcela_id": "xyz"
+}
 
-```bash
-# Cargar datos de demo en Firestore
-cd modulo4_api_gateway
-node scripts/cargar_demo.js
+// Response 200
+{ "respuesta": "Con el Algarrobo en tu parcela, en los primeros 6 meses..." }
+```
+
+---
+
+## Credenciales necesarias
+
+| Archivo / Variable | Dónde conseguirlo |
+|---|---|
+| `serviceAccountKey.json` | GCP Console → IAM → Service Accounts |
+| `google-services.json` | Firebase Console → Project Settings → Android |
+| `GoogleService-Info.plist` | Firebase Console → Project Settings → iOS |
+| `MAPS_API_KEY` | GCP Console → APIs & Services → Credentials |
+
+## APIs a habilitar en GCP
+
+```
+Firebase Authentication API
+Cloud Firestore API
+Earth Engine API
+Vertex AI API
+Cloud Run API
+Maps SDK for Android / iOS
 ```
 
 ---
 
 ## Licencia
 
-MIT — Hackathon Google 2025
+MIT — Hackathon 2025
