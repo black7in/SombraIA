@@ -1,0 +1,25 @@
+{
+  "puntos": [
+    { "lat": -17.4823, "lng": -63.2514, "especie": "Tajibo", "posicion": "norte", "distancia_borde_m": 5 },
+    { "lat": -17.4831, "lng": -63.2508, "especie": "Toborochi", "posicion": "este", "distancia_borde_m": 8 },
+    { "lat": -17.4819, "lng": -63.2521, "especie": "Algarrobo", "posicion": "borde_sur", "distancia_borde_m": 3 },
+    { "lat": -17.4826, "lng": -63.2498, "especie": "Cuchi", "posicion": "oeste", "distancia_borde_m": 6 },
+    { "lat": -17.4835, "lng": -63.2515, "especie": "Cedro", "posicion": "cortavientos", "distancia_borde_m": 10 }
+  ],
+  "ahorro_agua_pct": 32,
+  "reduccion_temp_suelo_c": 2.1,
+  "ndvi": 0.41,
+  "zona_quemada": false,
+  "cultivos_compatibles": ["poroto", "yuca", "maní"],
+  "cobertura_recomendada": "pasto nativo entre hileras",
+  "datos_para_gemini": {
+    "horas_sol_directo": 9.2,
+    "temp_suelo_actual": 38,
+    "temp_suelo_proyectada": 35.9,
+    "cultivo_actual": "soya",
+    "area_ha": 1.2,
+    "municipio": "San Julián",
+    "mes_optimo_plantacion": "octubre",
+    "arboles_sugeridos": 5
+  }
+}

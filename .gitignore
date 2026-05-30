@@ -1,0 +1,34 @@
+# Credenciales — NUNCA subir al repo
+serviceAccountKey.json
+.env
+.env.local
+.env.*.local
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.Python
+dist/
+build/
+*.egg-info/
+
+# Earth Engine
+.earthengine/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Cloud Run / Docker
+.dockerignore

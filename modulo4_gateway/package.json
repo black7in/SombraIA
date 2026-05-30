@@ -1,0 +1,20 @@
+{
+  "name": "sombraia-gateway",
+  "version": "1.0.0",
+  "engines": { "node": "20" },
+  "scripts": {
+    "start": "functions-framework --target=gateway --port=8080",
+    "dev": "NODE_ENV=development functions-framework --target=gateway --port=8080",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^3.4.0",
+    "firebase-admin": "^12.0.0",
+    "axios": "^1.7.2",
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
