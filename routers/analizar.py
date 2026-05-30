@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from typing import List
+from pydantic import BaseModel, model_validator
+from typing import List, Literal, Optional
 
 from middleware.auth import verify_token
 from services import motor, gemini
@@ -10,9 +10,15 @@ router = APIRouter()
 
 class SolicitudAnalisis(BaseModel):
     poligono: List[List[float]]
-    cultivo: str
-    modo: str = "agro"
+    modo: Literal["agro", "ambiental"] = "ambiental"
+    cultivo: Optional[str] = None
     n_arboles: int = 5
+
+    @model_validator(mode="after")
+    def cultivo_requerido_en_agro(self):
+        if self.modo == "agro" and not self.cultivo:
+            raise ValueError("El campo 'cultivo' es requerido en modo agro")
+        return self
 
 
 @router.post("/analizar")
@@ -20,22 +26,31 @@ def analizar(solicitud: SolicitudAnalisis, user=Depends(verify_token)):
     try:
         resultado = motor.analizar(
             solicitud.poligono,
-            solicitud.cultivo,
             solicitud.modo,
             solicitud.n_arboles,
+            solicitud.cultivo,
         )
 
         datos = resultado["datos_para_gemini"]
-        datos["ahorro_agua_pct"] = resultado["ahorro_agua_pct"]
+        zona_quemada = resultado["zona_quemada"]
+        puntos = resultado["puntos"]
 
-        if resultado["zona_quemada"]:
-            texto = gemini.recomendar_zona_quemada(datos, resultado["puntos"])
+        if solicitud.modo == "agro":
+            if zona_quemada:
+                texto = gemini.recomendar_agro_zona_quemada(datos, puntos)
+            else:
+                texto = gemini.recomendar_agro(datos, puntos, resultado["cultivos_compatibles"])
         else:
-            texto = gemini.recomendar(datos, resultado["puntos"], resultado["cultivos_compatibles"])
+            if zona_quemada:
+                texto = gemini.recomendar_ambiental_zona_quemada(datos, puntos)
+            else:
+                texto = gemini.recomendar_ambiental(datos, puntos)
 
         resultado["recomendacion_texto"] = texto
         del resultado["datos_para_gemini"]
         return resultado
 
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,4 +1,5 @@
 import json
+import math
 import pvlib
 import pandas as pd
 import ee
@@ -10,7 +11,7 @@ _ESPECIES = json.loads(
 )
 
 
-def analizar(poligono: list, cultivo: str, modo: str, n_arboles: int) -> dict:
+def analizar(poligono: list, modo: str, n_arboles: int, cultivo: str = None) -> dict:
     lats = [p[0] for p in poligono]
     lngs = [p[1] for p in poligono]
     lat_c = sum(lats) / len(lats)
@@ -18,11 +19,20 @@ def analizar(poligono: list, cultivo: str, modo: str, n_arboles: int) -> dict:
 
     solar = _calcular_horas_sol(lat_c, lng_c)
     ee_data = _analizar_parcela(poligono)
-    puntos = _optimizar_plantacion(poligono, cultivo, solar, n_arboles)
+
+    if modo == "agro":
+        return _resultado_agro(poligono, cultivo, solar, ee_data, n_arboles)
+    else:
+        return _resultado_ambiental(poligono, solar, ee_data, n_arboles)
+
+
+def _resultado_agro(poligono, cultivo, solar, ee_data, n_arboles):
+    puntos = _optimizar_plantacion(poligono, solar, n_arboles, cultivo=cultivo)
     cultivos = _recomendar_cultivos(cultivo, ee_data["ndvi"], ee_data["zona_quemada"])
     ahorro = round(25 + min(solar["horas_criticas_dia"] * 1.5, 15))
 
     return {
+        "modo": "agro",
         "puntos": puntos,
         "ahorro_agua_pct": ahorro,
         "reduccion_temp_suelo_c": 2.1,
@@ -39,7 +49,57 @@ def analizar(poligono: list, cultivo: str, modo: str, n_arboles: int) -> dict:
             "ndvi": ee_data["ndvi"],
             "zona_quemada": ee_data["zona_quemada"],
             "arboles_sugeridos": len(puntos),
+            "ahorro_agua_pct": ahorro,
         },
+    }
+
+
+def _resultado_ambiental(poligono, solar, ee_data, n_arboles):
+    puntos = _optimizar_plantacion(poligono, solar, n_arboles, cultivo=None)
+    impacto = _calcular_impacto_ambiental(poligono, puntos)
+
+    return {
+        "modo": "ambiental",
+        "puntos": puntos,
+        "cobertura_sombra_pct": impacto["cobertura_sombra_pct"],
+        "co2_estimado_kg_anual": impacto["co2_estimado_kg_anual"],
+        "reduccion_temp_suelo_c": 2.1,
+        "ndvi": ee_data["ndvi"],
+        "zona_quemada": ee_data["zona_quemada"],
+        "datos_para_gemini": {
+            "horas_sol_directo": solar["horas_sol_dia"],
+            "horas_criticas_dia": solar["horas_criticas_dia"],
+            "temp_suelo_actual": ee_data["temp_suelo_c"],
+            "temp_suelo_proyectada": round(ee_data["temp_suelo_c"] - 2.1, 1),
+            "ndvi": ee_data["ndvi"],
+            "zona_quemada": ee_data["zona_quemada"],
+            "arboles_sugeridos": len(puntos),
+            "cobertura_sombra_pct": impacto["cobertura_sombra_pct"],
+            "co2_estimado_kg_anual": impacto["co2_estimado_kg_anual"],
+        },
+    }
+
+
+def _calcular_impacto_ambiental(poligono: list, puntos: list) -> dict:
+    shape = Polygon([(p[1], p[0]) for p in poligono])
+    area_m2 = shape.area * (111_000 ** 2)
+
+    especies_por_nombre = {e["nombre"]: e for e in _ESPECIES}
+    sombra_total_m2 = 0
+    co2_total = 0
+
+    for p in puntos:
+        especie = especies_por_nombre.get(p["especie"], {})
+        radio = especie.get("radio_sombra_m", 6)
+        altura = especie.get("altura_max_m", 10)
+        sombra_total_m2 += math.pi * radio ** 2
+        co2_total += round(20 + altura * 1.8)
+
+    cobertura_pct = min(100, round(sombra_total_m2 / area_m2 * 100, 1)) if area_m2 > 0 else 0
+
+    return {
+        "cobertura_sombra_pct": cobertura_pct,
+        "co2_estimado_kg_anual": round(co2_total),
     }
 
 
@@ -137,14 +197,18 @@ def _analizar_parcela(poligono: list) -> dict:
     }
 
 
-def _optimizar_plantacion(poligono: list, cultivo: str, solar: dict, n_arboles: int) -> list:
+def _optimizar_plantacion(poligono: list, solar: dict, n_arboles: int, cultivo: str = None) -> list:
     shape = Polygon([(p[1], p[0]) for p in poligono])
     bounds = shape.bounds
     posicion_optima = solar.get("posicion_sombra_optima", "norte")
 
-    especies_validas = [e for e in _ESPECIES if cultivo in e.get("compatible_con", [])]
-    if not especies_validas:
-        especies_validas = _ESPECIES[:3]
+    if cultivo:
+        especies_validas = [e for e in _ESPECIES if cultivo in e.get("compatible_con", [])]
+        if not especies_validas:
+            especies_validas = _ESPECIES[:3]
+    else:
+        # Modo ambiental: priorizar mayor radio de sombra y diversidad nativa
+        especies_validas = sorted(_ESPECIES, key=lambda e: e.get("radio_sombra_m", 0), reverse=True)
 
     offsets = {
         "norte": (0, 0.0003),

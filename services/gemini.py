@@ -21,7 +21,9 @@ def _generar(prompt: str) -> str:
     return response.candidates[0].content.parts[0].text
 
 
-def recomendar(datos: dict, puntos: list, cultivos: list) -> str:
+# --- Modo agro ---
+
+def recomendar_agro(datos: dict, puntos: list, cultivos: list) -> str:
     arboles_txt = "\n".join(
         f"- {p['especie']} al {p['posicion']}, a {p['distancia_borde_m']}m del borde"
         for p in puntos
@@ -49,12 +51,12 @@ Respondé solo con el texto de la recomendación, sin títulos ni listas.
 """.strip())
 
 
-def recomendar_zona_quemada(datos: dict, puntos: list) -> str:
+def recomendar_agro_zona_quemada(datos: dict, puntos: list) -> str:
     especies_txt = ", ".join(p["especie"] for p in puntos)
     return _generar(f"""
-Sos un experto en reforestación post-incendio en Santa Cruz, Bolivia.
-Explicá el plan de recuperación para esta zona afectada.
-Lenguaje simple, máximo 4 oraciones, como si le hablaras al dueño del terreno.
+Sos un experto en recuperación de suelos agrícolas post-incendio en Santa Cruz, Bolivia.
+Explicá el plan de recuperación para este terreno afectado que el dueño quiere volver a cultivar.
+Lenguaje simple, máximo 4 oraciones, como si le hablaras al agricultor.
 
 Situación:
 - Zona afectada por incendio reciente
@@ -63,24 +65,84 @@ Situación:
 - Árboles pioneros recomendados: {datos['arboles_sugeridos']}
 - Especies: {especies_txt}
 
-Incluí: qué hacer primero, por qué estas especies y qué esperar en 12 meses.
+Incluí: qué hacer primero, por qué estas especies ayudan al suelo y qué esperar en 12 meses.
 Respondé solo con el texto, sin títulos.
 """.strip())
 
 
-def chatbot(pregunta: str, contexto: dict) -> str:
+# --- Modo ambiental ---
+
+def recomendar_ambiental(datos: dict, puntos: list) -> str:
+    arboles_txt = "\n".join(
+        f"- {p['especie']} al {p['posicion']}, a {p['distancia_borde_m']}m del borde"
+        for p in puntos
+    )
     return _generar(f"""
-Sos un agrónomo de Santa Cruz, Bolivia. Respondé esta pregunta del agricultor
-sobre su parcela de forma concisa (máximo 3 oraciones). Usá el contexto de su
-parcela para dar una respuesta personalizada.
+Sos un especialista en reforestación y medio ambiente en Santa Cruz, Bolivia.
+Explicá a esta persona por qué estos árboles son la mejor elección para su terreno
+y qué impacto van a tener. Usá lenguaje simple y entusiasta. Máximo 4 oraciones.
 
-Contexto de su parcela:
-- Cultivo: {contexto.get('cultivo', 'no registrado')}
-- Ubicación: {contexto.get('municipio', 'Santa Cruz')}
+Datos del terreno:
+- Temperatura del suelo: {datos['temp_suelo_actual']}°C
+- Horas de sol intenso por día: {datos['horas_criticas_dia']} horas
+- NDVI actual (salud del suelo): {datos['ndvi']}
+- Árboles recomendados: {datos['arboles_sugeridos']}
+- Cobertura de sombra proyectada: {datos['cobertura_sombra_pct']}% del terreno
+- CO2 que van a capturar por año: {datos['co2_estimado_kg_anual']} kg
+- Temperatura proyectada con sombra: {datos['temp_suelo_proyectada']}°C
+
+Árboles específicos:
+{arboles_txt}
+
+Destacá el impacto ambiental real y por qué son especies nativas valiosas para la región.
+Respondé solo con el texto, sin títulos ni listas.
+""".strip())
+
+
+def recomendar_ambiental_zona_quemada(datos: dict, puntos: list) -> str:
+    especies_txt = ", ".join(p["especie"] for p in puntos)
+    return _generar(f"""
+Sos un especialista en reforestación post-incendio en Santa Cruz, Bolivia.
+Explicá el plan de recuperación ambiental para este terreno quemado.
+Lenguaje simple y esperanzador, máximo 4 oraciones, como si le hablaras al dueño.
+
+Situación:
+- Terreno afectado por incendio reciente
+- NDVI actual: {datos['ndvi']} (suelo muy dañado)
+- Temperatura del suelo: {datos['temp_suelo_actual']}°C
+- Árboles pioneros recomendados: {datos['arboles_sugeridos']}
+- Especies: {especies_txt}
+- CO2 que van a capturar por año una vez establecidos: {datos['co2_estimado_kg_anual']} kg
+
+Incluí: qué hacer primero, por qué estas especies son ideales para recuperar el ecosistema
+y qué transformación puede esperar en 12-24 meses.
+Respondé solo con el texto, sin títulos.
+""".strip())
+
+
+# --- Chatbot y calendario (ambos modos) ---
+
+def chatbot(pregunta: str, contexto: dict) -> str:
+    modo = contexto.get("modo", "ambiental")
+    if modo == "agro":
+        ctx_txt = f"""- Cultivo: {contexto.get('cultivo', 'no registrado')}
 - Árboles plantados: {', '.join(contexto.get('especies', [])) or 'no registrado'}
-- Último análisis: ahorro de agua {contexto.get('ahorro_agua_pct', 0)}%
+- Ahorro de agua: {contexto.get('ahorro_agua_pct', 0)}%"""
+    else:
+        ctx_txt = f"""- Tipo de terreno: uso ambiental / reforestación
+- Árboles plantados: {', '.join(contexto.get('especies', [])) or 'no registrado'}
+- Cobertura de sombra: {contexto.get('cobertura_sombra_pct', 0)}%
+- CO2 capturado por año: {contexto.get('co2_estimado_kg_anual', 0)} kg"""
 
-Pregunta del agricultor: "{pregunta}"
+    return _generar(f"""
+Sos un experto en árboles nativos y agroforestería de Santa Cruz, Bolivia.
+Respondé esta pregunta de forma concisa (máximo 3 oraciones).
+Usá el contexto del terreno para personalizar la respuesta.
+
+Contexto del terreno:
+{ctx_txt}
+
+Pregunta: "{pregunta}"
 
 Respondé directamente sin presentarte.
 """.strip())
