@@ -112,6 +112,15 @@ Características adicionales:
 
 ---
 
+## Documentación
+
+| Archivo | Descripción |
+|---------|-------------|
+| [Documentacion.pdf](docs/Documentacion.pdf) | Documento técnico del proyecto |
+| [Presentacion.pptx](docs/Presentacion.pptx) | PowerPoint de presentación |
+
+---
+
 ## Instrucciones de ejecución
 
 ### Requisitos previos
