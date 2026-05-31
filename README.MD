@@ -25,6 +25,15 @@ SombraAI permite a cualquier persona con un terreno analizar su parcela desde el
 
 ---
 
+## Documentación
+
+| Archivo | Descripción |
+|---------|-------------|
+| [Documentacion.pdf](docs/SombraIA...pdf) | Documento técnico del proyecto |
+| [Presentacion.pptx](docs/SombraIA_presentacion.pptx) | PowerPoint de presentación |
+
+---
+
 ## Descripción general
 
 SombraAI tiene dos modos de análisis:
@@ -109,15 +118,6 @@ Características adicionales:
     <td align="center"><img src="assets/6.jpeg" width="220" /><br/><sub>Pantalla 6</sub></td>
   </tr>
 </table>
-
----
-
-## Documentación
-
-| Archivo | Descripción |
-|---------|-------------|
-| [Documentacion.pdf](docs/Documentacion.pdf) | Documento técnico del proyecto |
-| [Presentacion.pptx](docs/Presentacion.pptx) | PowerPoint de presentación |
 
 ---
 

@@ -26,7 +26,14 @@
       "Bash(.\\\\venv\\\\Scripts\\\\activate)",
       "Bash(pip install *)",
       "Bash(.\\\\gradlew clean *)",
-      "PowerShell(Get-Process *)"
+      "PowerShell(Get-Process *)",
+      "PowerShell(gcloud auth list *)",
+      "Bash(ssh *)",
+      "Bash(rsync -av --exclude='.git' --exclude='venv' --exclude='__pycache__' --exclude='*.pyc' --exclude='serviceAccountKey.json' --exclude='.env' /d/ProyectosMVPs/SombraAI/ Hackaton:~/SombraAI/)",
+      "Bash(scp -r /d/ProyectosMVPs/SombraAI/. Hackaton:~/SombraAI/)",
+      "Bash(scp *)",
+      "Bash(git pull *)",
+      "Bash(git stash *)"
     ]
   }
 }
