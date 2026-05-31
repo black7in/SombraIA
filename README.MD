@@ -13,7 +13,7 @@ SombraAI permite a cualquier persona con un terreno analizar su parcela desde el
 | 1 | Rosales Velasco Adrian B. |
 | 2 | Chacón Vidal Carla Nicol |
 | 3 | Vasquez Flores Josue |
-| 4 | _(pendiente PR)_  |
+| 4 | Marañon Hurtado Rosa Andrea |
 | 5 | _(pendiente PR)_  |
 
 > **Colaboradores:** para registrarte, editá esta tabla en un PR con tu nombre y rol.
