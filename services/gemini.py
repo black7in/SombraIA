@@ -1,24 +1,22 @@
 import os
-import vertexai
-from vertexai.generative_models import GenerativeModel
+from google import genai
 
-_model = None
+_client = None
 
 
-def _get_model() -> GenerativeModel:
-    global _model
-    if _model is None:
-        vertexai.init(
-            project=os.environ["GOOGLE_CLOUD_PROJECT"],
-            location="us-central1",
-        )
-        _model = GenerativeModel("gemini-1.5-flash")
-    return _model
+def _get_client():
+    global _client
+    if _client is None:
+        _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    return _client
 
 
 def _generar(prompt: str) -> str:
-    response = _get_model().generate_content(prompt)
-    return response.candidates[0].content.parts[0].text
+    response = _get_client().models.generate_content(
+        model="models/gemini-2.5-flash",
+        contents=prompt,
+    )
+    return response.text
 
 
 # --- Modo agro ---

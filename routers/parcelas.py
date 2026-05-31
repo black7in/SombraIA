@@ -30,11 +30,22 @@ def _verificar_acceso(doc, uid: str):
         raise HTTPException(status_code=403, detail="Sin permiso")
 
 
+def _poly_save(poligono: List[List[float]]):
+    return [{"lng": p[0], "lat": p[1]} for p in poligono]
+
+
+def _poly_load(data: dict) -> dict:
+    raw = data.get("poligono")
+    if isinstance(raw, list) and raw and isinstance(raw[0], dict):
+        data["poligono"] = [[p["lng"], p["lat"]] for p in raw]
+    return data
+
+
 @router.get("/parcelas")
 def listar_parcelas(user=Depends(verify_token)):
     db = get_db()
     docs = db.collection("parcelas").where("user_id", "==", user["uid"]).limit(50).stream()
-    return [{"id": d.id, **d.to_dict()} for d in docs]
+    return [{"id": d.id, **_poly_load(d.to_dict())} for d in docs]
 
 
 @router.get("/parcelas/{parcela_id}")
@@ -42,7 +53,7 @@ def obtener_parcela(parcela_id: str, user=Depends(verify_token)):
     db = get_db()
     doc = db.collection("parcelas").document(parcela_id).get()
     _verificar_acceso(doc, user["uid"])
-    return {"id": doc.id, **doc.to_dict()}
+    return {"id": doc.id, **_poly_load(doc.to_dict())}
 
 
 @router.post("/parcelas", status_code=201)
@@ -51,7 +62,7 @@ def guardar_parcela(parcela: NuevaParcela, user=Depends(verify_token)):
     _, ref = db.collection("parcelas").add({
         "user_id": user["uid"],
         "nombre": parcela.nombre,
-        "poligono": parcela.poligono,
+        "poligono": _poly_save(parcela.poligono),
         "modo": parcela.modo,
         "cultivo": parcela.cultivo,
         "resultado": parcela.resultado,

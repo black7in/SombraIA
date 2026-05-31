@@ -14,8 +14,8 @@ _VELOCIDAD_M_ANIO = {"rapida": 1.5, "media": 0.9, "lenta": 0.4}
 
 
 def analizar(poligono: list, modo: str, n_arboles: int, cultivo: str = None) -> dict:
-    lats = [p[0] for p in poligono]
-    lngs = [p[1] for p in poligono]
+    lngs = [p[0] for p in poligono]
+    lats = [p[1] for p in poligono]
     lat_c = sum(lats) / len(lats)
     lng_c = sum(lngs) / len(lngs)
 
@@ -28,7 +28,7 @@ def analizar(poligono: list, modo: str, n_arboles: int, cultivo: str = None) -> 
 
 
 def _resultado_agro(poligono, cultivo, solar, ee_data, n_arboles):
-    shape = Polygon([(p[1], p[0]) for p in poligono])
+    shape = Polygon([(p[0], p[1]) for p in poligono])
     posicion_optima = solar.get("posicion_sombra_optima", "norte")
 
     especies_validas = [e for e in _ESPECIES if cultivo in e.get("compatible_con", [])]
@@ -64,7 +64,7 @@ def _resultado_agro(poligono, cultivo, solar, ee_data, n_arboles):
 
 
 def _resultado_ambiental(poligono, solar, ee_data, n_arboles):
-    shape = Polygon([(p[1], p[0]) for p in poligono])
+    shape = Polygon([(p[0], p[1]) for p in poligono])
     posicion_optima = solar.get("posicion_sombra_optima", "norte")
 
     especies_validas = sorted(_ESPECIES, key=lambda e: e.get("radio_sombra_m", 0), reverse=True)
@@ -233,13 +233,16 @@ def _azimuth_a_posicion(azimuth: float) -> str:
 
 
 def _analizar_parcela(poligono: list) -> dict:
-    coords = [[p[1], p[0]] for p in poligono]
+    coords = [[p[0], p[1]] for p in poligono]  # [lng, lat] para Earth Engine
     region = ee.Geometry.Polygon(coords)
 
-    ndvi_valor = (
+    s2 = (
         ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
-        .filterBounds(region).filterDate("2024-09-01", "2024-12-01")
-        .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 20)).median()
+        .filterBounds(region).filterDate("2023-01-01", "2024-12-31")
+        .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 50))
+    )
+    ndvi_valor = (
+        s2.median()
         .normalizedDifference(["B8", "B4"])
         .reduceRegion(reducer=ee.Reducer.mean(), geometry=region, scale=10)
         .getInfo().get("nd", 0)
