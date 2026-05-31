@@ -11,7 +11,7 @@ SombraAI permite a cualquier persona con un terreno analizar su parcela desde el
 | # | Nombre  |
 |---|-------------|
 | 1 | Rosales Velasco Adrian B. |
-| 2 | _(pendiente PR)_  |
+| 2 | Vasquez Flores Josue
 | 3 | _(pendiente PR)_  |
 | 4 | _(pendiente PR)_  |
 | 5 | _(pendiente PR)_  |
