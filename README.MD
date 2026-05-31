@@ -1,6 +1,6 @@
 # SombraAI 🌳
 
-> Plataforma de recomendación inteligente de plantación de árboles nativos para Santa Cruz, Bolivia.
+> Plataforma de recomendación inteligente para planificar plantación de arboles nativos y ayudar con la reforestación provocada por los incendios en Santa Cruz.
 
 SombraAI permite a cualquier persona con un terreno analizar su parcela desde el celular, recibir puntos estratégicos de plantación calculados por satélite e IA, hacer seguimiento a los árboles plantados y consultar un asistente agronómico por texto o voz.
 
