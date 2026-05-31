@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git remote *)",
+      "Bash(git branch *)",
+      "Bash(git push *)",
+      "Bash(Get-ChildItem -Path \"D:\\\\ProyectosMVPs\\\\SombraAI\" -Force)",
+      "Bash(Select-Object Name, FullName)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(del routers\\\\alertas.py)",
+      "PowerShell(Remove-Item *)",
+      "Bash(git commit *)",
+      "Bash(Test-Path *)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://127.0.0.1:8080/api/health\" -Method GET | ConvertTo-Json)",
+      "PowerShell(Stop-Process *)",
+      "Bash(curl *)",
+      "Bash(.venv\\\\Scripts\\\\python.exe *)",
+      "PowerShell(gcloud projects add-iam-policy-binding hakathon20261 *)",
+      "Bash(python3 -m json.tool)",
+      "PowerShell(Set-Location D:\\\\ProyectosMVPs\\\\SombraAI; $id = \\(Invoke-RestMethod -Method POST -Uri \"http://localhost:8080/api/parcelas\" -ContentType \"application/json\" -Body '{\"nombre\":\"Test Cal\",\"poligono\":[[-63.18,-17.78],[-63.17,-17.78],[-63.17,-17.77],[-63.18,-17.77]],\"resultado\":{\"puntos\":[{\"especie\":\"Toborochi\"},{\"especie\":\"Tajibo\"}]}}'\\).id; Write-Host \"Parcela: $id\"; Invoke-RestMethod -Uri \"http://localhost:8080/api/parcelas/$id/calendario?municipio=Santa+Cruz\" | ConvertTo-Json -Depth 3)",
+      "Bash(npm install *)",
+      "Bash(node *)",
+      "PowerShell(java *)",
+      "Bash(npx expo *)",
+      "Bash(.\\\\venv\\\\Scripts\\\\activate)",
+      "Bash(pip install *)",
+      "Bash(.\\\\gradlew clean *)",
+      "PowerShell(Get-Process *)"
+    ]
+  }
+}

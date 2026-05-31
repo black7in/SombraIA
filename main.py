@@ -9,7 +9,7 @@ import firebase_admin
 from firebase_admin import credentials
 from google.oauth2 import service_account
 
-from routers import analizar, parcelas, chat, auth
+from routers import analizar, parcelas, chat, auth, arboles, voz
 
 _EE_SCOPES = [
     "https://www.googleapis.com/auth/earthengine",
@@ -43,6 +43,8 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(analizar.router, prefix="/api")
 app.include_router(parcelas.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(arboles.router, prefix="/api")
+app.include_router(voz.router, prefix="/api")
 
 
 @app.get("/api/health")

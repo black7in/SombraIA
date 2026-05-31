@@ -13,22 +13,32 @@ _ESPECIES = json.loads(
 _VELOCIDAD_M_ANIO = {"rapida": 1.5, "media": 0.9, "lenta": 0.4}
 
 
-def analizar(poligono: list, modo: str, n_arboles: int, cultivo: str = None) -> dict:
+def analizar(poligono: list, modo: str, cultivo: str = None) -> dict:
     lngs = [p[0] for p in poligono]
     lats = [p[1] for p in poligono]
     lat_c = sum(lats) / len(lats)
     lng_c = sum(lngs) / len(lngs)
 
+    shape = Polygon([(p[0], p[1]) for p in poligono])
+    n_arboles = _calcular_n_arboles(shape, modo)
+
     solar = _calcular_horas_sol(lat_c, lng_c)
     ee_data = _analizar_parcela(poligono)
 
     if modo == "agro":
-        return _resultado_agro(poligono, cultivo, solar, ee_data, n_arboles)
-    return _resultado_ambiental(poligono, solar, ee_data, n_arboles)
+        return _resultado_agro(shape, cultivo, solar, ee_data, n_arboles)
+    return _resultado_ambiental(shape, solar, ee_data, n_arboles)
 
 
-def _resultado_agro(poligono, cultivo, solar, ee_data, n_arboles):
-    shape = Polygon([(p[0], p[1]) for p in poligono])
+def _calcular_n_arboles(shape: Polygon, modo: str) -> int:
+    area_m2 = shape.area * (111_000 ** 2)
+    perimetro_m = shape.length * 111_000
+    if modo == "agro":
+        return max(3, min(30, int(perimetro_m / 6)))
+    return max(3, min(30, int(area_m2 / 40)))
+
+
+def _resultado_agro(shape, cultivo, solar, ee_data, n_arboles):
     posicion_optima = solar.get("posicion_sombra_optima", "norte")
 
     especies_validas = [e for e in _ESPECIES if cultivo in e.get("compatible_con", [])]
@@ -46,6 +56,7 @@ def _resultado_agro(poligono, cultivo, solar, ee_data, n_arboles):
         "reduccion_temp_suelo_c": 2.1,
         "ndvi": ee_data["ndvi"],
         "zona_quemada": ee_data["zona_quemada"],
+        "hay_construccion": ee_data["hay_construccion"],
         "cultivos_compatibles": cultivos,
         "cobertura_recomendada": "pasto nativo entre hileras",
         "datos_para_gemini": {
@@ -56,6 +67,7 @@ def _resultado_agro(poligono, cultivo, solar, ee_data, n_arboles):
             "cultivo_actual": cultivo,
             "ndvi": ee_data["ndvi"],
             "zona_quemada": ee_data["zona_quemada"],
+            "hay_construccion": ee_data["hay_construccion"],
             "arboles_sugeridos": len(puntos),
             "ahorro_agua_pct": ahorro,
             "posicion_cortina": posicion_optima,
@@ -63,8 +75,7 @@ def _resultado_agro(poligono, cultivo, solar, ee_data, n_arboles):
     }
 
 
-def _resultado_ambiental(poligono, solar, ee_data, n_arboles):
-    shape = Polygon([(p[0], p[1]) for p in poligono])
+def _resultado_ambiental(shape, solar, ee_data, n_arboles):
     posicion_optima = solar.get("posicion_sombra_optima", "norte")
 
     especies_validas = sorted(_ESPECIES, key=lambda e: e.get("radio_sombra_m", 0), reverse=True)
@@ -81,6 +92,7 @@ def _resultado_ambiental(poligono, solar, ee_data, n_arboles):
         "reduccion_temp_suelo_c": 2.1,
         "ndvi": ee_data["ndvi"],
         "zona_quemada": ee_data["zona_quemada"],
+        "hay_construccion": ee_data["hay_construccion"],
         "proyeccion_crecimiento": proyeccion,
         "datos_para_gemini": {
             "horas_sol_directo": solar["horas_sol_dia"],
@@ -89,6 +101,7 @@ def _resultado_ambiental(poligono, solar, ee_data, n_arboles):
             "temp_suelo_proyectada": round(ee_data["temp_suelo_c"] - 2.1, 1),
             "ndvi": ee_data["ndvi"],
             "zona_quemada": ee_data["zona_quemada"],
+            "hay_construccion": ee_data["hay_construccion"],
             "arboles_sugeridos": len(puntos),
             "cobertura_sombra_pct": impacto["cobertura_sombra_pct"],
             "co2_estimado_kg_anual": impacto["co2_estimado_kg_anual"],
@@ -131,23 +144,26 @@ def _puntos_en_borde(shape: Polygon, posicion: str, n_arboles: int, especies: li
 
 
 def _puntos_interior(shape: Polygon, posicion_optima: str, n_arboles: int, especies: list) -> list:
-    """Ambiental: distribuye árboles dentro del polígono maximizando cobertura."""
-    bounds = shape.bounds
-    offsets = {
-        "norte": (0, 0.0003),
-        "sur": (0, -0.0003),
-        "este": (0.0003, 0),
-        "oeste": (-0.0003, 0),
-    }
-    posiciones = [posicion_optima, "borde", "cortavientos", "borde_este", "borde_oeste"]
-    puntos = []
+    """Ambiental: grilla proporcional al aspect ratio del terreno para máxima cobertura."""
+    minx, miny, maxx, maxy = shape.bounds
+    ancho = maxx - minx
+    alto = maxy - miny
+    aspect = (ancho / alto) if alto > 0 else 1
 
+    cols = max(1, round(math.sqrt(n_arboles * aspect)))
+    rows = max(1, math.ceil(n_arboles / cols))
+
+    puntos = []
     for i in range(n_arboles):
         especie = especies[i % len(especies)]
-        dx, dy = offsets.get(posicion_optima, (0, 0.0002))
-        t = (i + 1) / (n_arboles + 1)
-        px = bounds[0] + t * (bounds[2] - bounds[0]) + dx
-        py = (bounds[1] + bounds[3]) / 2 + dy
+        col = i % cols
+        row = i // cols
+
+        # Fracción dentro del bbox con margen proporcional
+        tx = (col + 1) / (cols + 1)
+        ty = (row + 1) / (rows + 1)
+        px = minx + tx * ancho
+        py = miny + ty * alto
 
         punto = Point(px, py)
         if not shape.contains(punto):
@@ -157,7 +173,7 @@ def _puntos_interior(shape: Polygon, posicion_optima: str, n_arboles: int, espec
             "lat": round(punto.y, 6),
             "lng": round(punto.x, 6),
             "especie": especie["nombre"],
-            "posicion": posiciones[i % len(posiciones)],
+            "posicion": f"fila_{row + 1}_col_{col + 1}",
             "distancia_borde_m": round(shape.exterior.distance(punto) * 111000, 1),
         })
 
@@ -261,10 +277,17 @@ def _analizar_parcela(poligono: list) -> dict:
         .reduceRegion(reducer=ee.Reducer.mean(), geometry=region, scale=1000)
         .getInfo().get("LST_Day_1km", 0)
     )
+    ndbi_valor = (
+        s2.median()
+        .normalizedDifference(["B11", "B8"])
+        .reduceRegion(reducer=ee.Reducer.mean(), geometry=region, scale=10)
+        .getInfo().get("nd", None)
+    )
     return {
         "ndvi": round(float(ndvi_valor or 0), 3),
-        "zona_quemada": bool(max_fire >= 7),
+        "zona_quemada": bool((max_fire or 0) >= 7),
         "temp_suelo_c": round((temp_k * 0.02) - 273.15, 1) if temp_k else 38.0,
+        "hay_construccion": bool((ndbi_valor or -1) > 0.1),
     }
 
 

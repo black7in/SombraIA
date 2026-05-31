@@ -12,7 +12,6 @@ class SolicitudAnalisis(BaseModel):
     poligono: List[List[float]]
     modo: Literal["agro", "ambiental"] = "ambiental"
     cultivo: Optional[str] = None
-    n_arboles: int = 5
 
     @model_validator(mode="after")
     def cultivo_requerido_en_agro(self):
@@ -27,7 +26,6 @@ def analizar(solicitud: SolicitudAnalisis, user=Depends(verify_token)):
         resultado = motor.analizar(
             solicitud.poligono,
             solicitud.modo,
-            solicitud.n_arboles,
             solicitud.cultivo,
         )
 
